@@ -69,6 +69,24 @@ class MovieView(Resource):
         all_movie = Movie.query.all()
         return movies_schema.dump(all_movie), 200
 
+    def post(self):
+        req_json = request.json
+        new_movie = Movie(**req_json)
+        with db.session.begin():
+            db.session.add(new_movie)
+        return "", 201
+
+    def get(self):
+        director_id = request.args.get("director_id")
+        genre_id = request.args.get("genre_id")
+        query = Movie.query
+        if director_id:
+            query = query.filter(Movie.director_id == director_id)
+        if genre_id:
+            query = query.filter(Movie.genre_id == genre_id)
+        return MovieSchema(many=True).dump(query.all()), 200
+
+
 @movie_ns.route('/<int:uid>')
 class MovieView(Resource):
 # получение конкретной сущности по идентификатору
@@ -79,49 +97,36 @@ class MovieView(Resource):
         except Exception as e:
             return "", 404
 
-
-#получение фильмов с определенным режиссером
-@movie_ns.route('/director_id=<int:uid>')
-class MovieView(Resource):
-    def get(self, uid: int):
-        all_movie = Movie.query.all()
-        all_movies = movies_schema.dump(all_movie)
-        movies_by_director = []
-        for movie in all_movies:
-            if movie['director_id'] == uid:
-                movies_by_director.append(movie)
-
-        return movies_by_director
-
-
-@movie_ns.route('/genre_id=<int:uid>')
-class MovieView(Resource):
-    def get(self, uid: int):
-        all_movie = Movie.query.all()
-        all_movies = movies_schema.dump(all_movie)
-        movies_by_genre = []
-        for movie in all_movies:
-            if movie['genre_id'] == uid:
-                movies_by_genre.append(movie)
-
-        return movies_by_genre
+    def put(self, uid: int):
+        movie = Movie.query.get(uid)
+        req_json = request.json
+        movie.title = req_json.get("title")
+        movie.description = req_json.get("description")
+        movie.trailer = req_json.get("trailer")
+        movie.year = req_json.get("year")
+        movie.rating = req_json.get("rating")
+        movie.genre_id = req_json.get("genre_id")
+        movie.genre = req_json.get("genre")
+        movie.director_id = req_json.get("director_id")
+        movie.director = req_json.get("director")
+        db.session.add(movie)
+        db.session.commit()
+        return "", 204
 
 
-@movie_ns.route('/director_id=<int:uid>&genre_id=<int:bid>')
-class MovieView(Resource):
-    def get(self, uid: int, bid: int):
-      #  возвращает только фильмы с определенным режиссером и жанром
-        all_movie = Movie.query.all()
-        all_movies = movies_schema.dump(all_movie)
-        movies_by_director = []
-        for movie in all_movies:
-            if movie['director_id'] == uid and movie['genre_id'] == bid:
-                movies_by_director.append(movie)
-        return movies_by_director
+    def delete(self, uid: int):
+        movie = Movie.query.get(uid)
+        db.session.delete(movie)
+        db.session.commit()
+        return "", 204
 
-
+#получение фильмов с определенным режиссеро
 @director_ns.route('/')
 class DirectorView(Resource):
+    def get(self):
+        all_directors = Director.query.all()
+        return movies_schema.dump(all_directors), 200
+
     def post(self):
         req_json = request.json
         new_director = Director(**req_json)
@@ -132,6 +137,11 @@ class DirectorView(Resource):
 
 @director_ns.route('/<int:uid>')
 class DirectorView(Resource):
+    def get(self, uid: int):
+
+        director = Director.query.get(uid)
+        return movie_schema.dump(director), 200
+
     def put(self, uid: int):
         director = Director.query.get(uid)
         req_json = request.json
@@ -140,7 +150,6 @@ class DirectorView(Resource):
         db.session.add(director)
         db.session.commit()
         return "", 204
-
 
     def delete(self, uid: int):
         director = Director.query.get(uid)
@@ -151,6 +160,10 @@ class DirectorView(Resource):
 
 @genre_ns.route('/')
 class GenreView(Resource):
+    def get(self):
+      all_genres = Genre.query.all()
+      return movies_schema.dump(all_genres), 200
+
     def post(self):
         req_json = request.json
         new_genre = Genre(**req_json)
@@ -161,6 +174,10 @@ class GenreView(Resource):
 
 @genre_ns.route('/<int:uid>')
 class GenreView(Resource):
+    def get(self, uid: int):
+        genre = Genre.query.get(uid)
+        return movie_schema.dump(genre)
+
     def put(self, uid: int):
         genre = Genre.query.get(uid)
         req_json = request.json
