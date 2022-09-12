@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+app.config['RESTX_JSON'] = {'ensure_ascii': False}
 
 db = SQLAlchemy(app)
 
@@ -38,6 +38,14 @@ class Genre(db.Model):
     name = db.Column(db.String(255))
 
 
+class GenreSchema(Schema):
+    id = fields.Int()
+    name = fields.Str()
+
+class DirectorSchema(Schema):
+    id = fields.Int()
+    name = fields.Str()
+
 class MovieSchema(Schema):
     id = fields.Int()
     title = fields.Str()
@@ -45,14 +53,17 @@ class MovieSchema(Schema):
     trailer = fields.Str()
     year = fields.Int()
     rating = fields.Int()
-    genre_id = fields.Int()
-    genre = fields.Str()
-    director_id = fields.Int()
-    director = fields.Str()
-
+    genre = fields.Nested(GenreSchema)
+    director = fields.Nested(DirectorSchema)
 
 movie_schema = MovieSchema()
 movies_schema = MovieSchema(many=True)
+
+genre_schema = GenreSchema()
+genres_schema = GenreSchema(many=True)
+
+director_schema = DirectorSchema()
+directors_schema = DirectorSchema(many=True)
 
 api = Api(app)
 movie_ns = api.namespace('movies')
@@ -63,12 +74,6 @@ genre_ns = api.namespace('genres')
 @movie_ns.route('/')
 # наследуем класс от класса Resource
 class MovieView(Resource):
-
-# получение списка фильмов, мы отдаем список всех фильмов из БД
-    def get(self):
-        all_movie = Movie.query.all()
-        return movies_schema.dump(all_movie), 200
-
     def post(self):
         req_json = request.json
         new_movie = Movie(**req_json)
@@ -106,9 +111,7 @@ class MovieView(Resource):
         movie.year = req_json.get("year")
         movie.rating = req_json.get("rating")
         movie.genre_id = req_json.get("genre_id")
-        movie.genre = req_json.get("genre")
         movie.director_id = req_json.get("director_id")
-        movie.director = req_json.get("director")
         db.session.add(movie)
         db.session.commit()
         return "", 204
@@ -125,7 +128,7 @@ class MovieView(Resource):
 class DirectorView(Resource):
     def get(self):
         all_directors = Director.query.all()
-        return movies_schema.dump(all_directors), 200
+        return directors_schema.dump(all_directors), 200
 
     def post(self):
         req_json = request.json
@@ -140,12 +143,11 @@ class DirectorView(Resource):
     def get(self, uid: int):
 
         director = Director.query.get(uid)
-        return movie_schema.dump(director), 200
+        return director_schema.dump(director), 200
 
     def put(self, uid: int):
         director = Director.query.get(uid)
         req_json = request.json
-        director.id = req_json.get("id")
         director.name = req_json.get("name")
         db.session.add(director)
         db.session.commit()
@@ -162,7 +164,7 @@ class DirectorView(Resource):
 class GenreView(Resource):
     def get(self):
       all_genres = Genre.query.all()
-      return movies_schema.dump(all_genres), 200
+      return genres_schema.dump(all_genres), 200
 
     def post(self):
         req_json = request.json
@@ -176,12 +178,11 @@ class GenreView(Resource):
 class GenreView(Resource):
     def get(self, uid: int):
         genre = Genre.query.get(uid)
-        return movie_schema.dump(genre)
+        return genre_schema.dump(genre)
 
     def put(self, uid: int):
         genre = Genre.query.get(uid)
         req_json = request.json
-        genre.id = req_json.get("id")
         genre.name = req_json.get("name")
         db.session.add(genre)
         db.session.commit()
